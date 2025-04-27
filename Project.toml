@@ -1,13 +1,13 @@
-name = "FKRB"
+name = "FKRBDemand"
 uuid = "ac267177-d275-4753-b7f9-46a5f58d4fd0"
 authors = ["James Brand <jamesbrandecon@gmail.com>"]
-version = "0.0.1-DEV"
+version = "0.0.1"
 
 [deps]
 Convex = "f65535da-76fb-5f13-bab9-19810c17039a"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
-FRAC = "876e2209-f438-4469-a9ec-3c471b9a3293"
+FRACDemand = "876e2209-f438-4469-a9ec-3c471b9a3293"
 FixedEffectModels = "9d5cd8c9-2029-5cab-9928-427838db53e3"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 IterTools = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
@@ -18,6 +18,17 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
 julia = "1"
+Convex = "0.16.0"
+DataFrames = "1.5.0"
+Distributions = "0.25.118"
+FRACDemand = "0.1.0"
+FixedEffectModels = "1.12.0"
+ForwardDiff = "0.10.38"
+IterTools = "1.3.0"
+LinearAlgebra = "1.0"
+Plots = "1.38.0"
+SCS = "2.1.0"
+StatsBase = "0.33.0"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

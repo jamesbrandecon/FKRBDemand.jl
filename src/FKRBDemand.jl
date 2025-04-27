@@ -1,4 +1,4 @@
-module FKRB
+module FKRBDemand
 
 # TODO 
 # cross-validation 
@@ -6,8 +6,8 @@ module FKRB
 
 # Import dependencies
 using DataFrames, LinearAlgebra 
-using IterTools
-using Distributions, FRAC, Plots, FixedEffectModels
+# using IterTools
+using Distributions, FRACDemand, Plots, FixedEffectModels
 using SCS, Convex
 using StatsBase, ForwardDiff
 
@@ -24,6 +24,7 @@ include("elasticities.jl")
 
 export FKRBProblem, define_problem, estimate!, 
     generate_regressors_aggregate, make_grid_points, plot_cdfs,
-    bootstrap!, subsample!, price_elasticities!
+    bootstrap!, subsample!, price_elasticities!, 
+    plot_pmfs
 
 end

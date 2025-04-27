@@ -106,19 +106,21 @@ function define_problem(;
 
     # Defind grid details object 
     if range == (-Inf, Inf)
-        println("Using FRAC.jl to generate intiial guess for grid points......");
-        instruments_in_df = (length(findall(occursin.(names(data), "demand_instruments")))>0);
+        println("Using FRACDemand.jl to generate intiial guess for grid points......");
+        instruments_in_df = (length(findall(occursin.("demand_instruments", names(data))))>0);
         if instruments_in_df 
-            println("Demand instruments detected -- using IVs for prices in FRAC.jl......")
+            println("Demand instruments detected -- using IVs for prices in FRACDemand.jl......")
         end
-        frac_problem = FRAC.define_problem(data = data, 
+        frac_problem = FRACDemand.define_problem(
+            data = data, 
             linear = linear, 
             nonlinear = nonlinear,
             fixed_effects = fixed_effects,
             se_type = "bootstrap", 
             constrained = false);
 
-        FRAC.estimate!(frac_problem)
+        FRACDemand.estimate!(frac_problem)
+        @show frac_problem.raw_results_internal
 
         data = frac_problem.data;
         for x in fixed_effects
