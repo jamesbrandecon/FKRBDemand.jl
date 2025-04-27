@@ -1,6 +1,5 @@
-using FKRB
-using Test
+using FKRBDemand, Test
 
-@testset "FKRB.jl" begin
-    # Write your tests here.
-end
+include("core_tests.jl")
+include("elasticnet_tests.jl")
+include("grids_tests.jl")

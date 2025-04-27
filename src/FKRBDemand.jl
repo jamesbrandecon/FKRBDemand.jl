@@ -6,7 +6,7 @@ module FKRBDemand
 
 # Import dependencies
 using DataFrames, LinearAlgebra 
-# using IterTools
+using IterTools
 using Distributions, FRACDemand, Plots, FixedEffectModels
 using SCS, Convex
 using StatsBase, ForwardDiff
