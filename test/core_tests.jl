@@ -14,7 +14,7 @@ using FKRBDemand, Test, DataFrames
 
     # FKRBProblem struct fields
     df = DataFrame(market_ids=[1], product_ids=[1])
-    prob = FKRBProblem(df, String[], String[], String[], zeros(0,0), Any[], Int[], Any[], Any[], Any[])
+    prob = FKRBProblem(df, String[], String[], String[], zeros(2,2), Any[], Int[], Any[], Any[], Any[])
     @test prob.data === df
     @test prob.nonlinear == String[]
 end
