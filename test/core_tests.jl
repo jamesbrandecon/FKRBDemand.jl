@@ -14,7 +14,19 @@ using FKRBDemand, Test, DataFrames
 
     # FKRBProblem struct fields
     df = DataFrame(market_ids=[1], product_ids=[1])
-    prob = FKRBProblem(df, String[], String[], String[], zeros(2,2), Any[], Int[], Any[], Any[], Any[])
+    prob = FKRBProblem(
+        df,                # data
+        String[],          # linear
+        String[],          # nonlinear
+        String[],          # iv
+        zeros(2,2),        # grid_points
+        zeros(0,0),        # regressors
+        Any[],             # results
+        Int[],             # train
+        Any[],             # inference_results
+        Any[],             # std
+        Any[]              # all_elasticities
+        )
     @test prob.data === df
     @test prob.nonlinear == String[]
 end

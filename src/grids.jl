@@ -16,7 +16,7 @@ function make_grid_points(data, linear, nonlinear; gridspec::FKRBGridDetails)
             univariate_grid = collect(range_dict[var])
             push!(store_univariates, univariate_grid)
         end
-        grid_points = collect(product(store_univariates...))
+        grid_points = collect(Iterators.product(store_univariates...))
         grid_points = Matrix(reduce(hcat, map(collect, grid_points))'); # Final Matrix() wrap is to remove adjoint
     else
         throw(ArgumentError("Method not recognized"))
