@@ -40,6 +40,7 @@ mutable struct FKRBProblem
     nonlinear::Vector{String}
     iv::Vector{String}
     grid_points::Matrix{Float64}
+    regressors::Matrix{Float64}
     results
     train::Vector{Int}
     inference_results # raw results from bootstrap/subsampling
@@ -120,7 +121,7 @@ function define_problem(;
             constrained = false);
 
         FRACDemand.estimate!(frac_problem)
-        @show frac_problem.raw_results_internal
+        # @show frac_problem.raw_results_internal
 
         data = frac_problem.data;
         for x in fixed_effects
@@ -160,8 +161,15 @@ function define_problem(;
     grid_points = make_grid_points(data, linear, nonlinear; gridspec = grid_details);
 
     # Return the problem
-    problem = FKRBProblem(sort(data, [:market_ids, :product_ids]), 
-            linear, nonlinear, [""], grid_points, [], train, [], [], [])
+    problem = FKRBProblem(
+        sort(data, [:market_ids, :product_ids]), 
+        linear, nonlinear, [""], grid_points, zeros(2,2), 
+        [], train, [], [], []);
+    
+    println("Grid points generated: ", size(grid_points, 1), " points in ", size(grid_points, 2), " dimensions")
+    println("Generating regressors for FKRB model......")
+    problem.regressors = generate_regressors_aggregate(
+        problem; method = "level");
 
     return problem
 end
@@ -210,9 +218,15 @@ end
 Estimates the FKRB model using constrained elastic net. Problem is solved using Convex.jl, and estimated weights 
 are constrained to be nonnegative and sum to 1. Results are stored in problem.results.
 """
-function estimate!(problem::FKRBProblem; method = "elasticnet", gamma = 0.3, lambda = 0.0)
+function estimate!(problem::FKRBProblem; method = "elasticnet",
+                constraints = nothing,
+                silent = true,
+                gamma = 0.5, lambda = 0.0,
+                cross_validate = false, folds = 5)
+
     data = problem.data;
     grid_points = problem.grid_points;
+    regressors = problem.regressors;
 
     if isempty(problem.train)
         train = 1:size(data, 1);
@@ -221,11 +235,39 @@ function estimate!(problem::FKRBProblem; method = "elasticnet", gamma = 0.3, lam
     end
 
     # Generate the RHS regressors that will show up in the estimation problem
-    regressors = generate_regressors_aggregate(problem);
+    #generate_regressors_aggregate(problem);
 
     # Combine into a DataFrame with one outcome and many regressors
     df_inner = DataFrame(regressors, :auto);
     df_inner[!,"y"] = data.shares;
+
+    if cross_validate
+        # require market_ids in problem.train
+        if isempty(problem.train)
+            throw(ArgumentError("problem.train must contain market_ids for CV when cross_validate=true"))
+        end
+        # subset rows whose market_ids ∈ problem.train
+        train_idx = findall(in(problem.train), data.market_ids)
+        X = Matrix(df_inner[train_idx, r"x"])
+        Y = df_inner[train_idx, "y"]
+        # require candidate vectors
+        if !(isa(gamma, AbstractVector) || isa(lambda, AbstractVector))
+            throw(ArgumentError("gamma or lambda must be a vector of candidates when cross_validate=true"))
+        end
+        if isa(gamma, Real)
+            gamma = [gamma]
+        end
+        best_error = Inf; best_gamma = nothing; best_lambda = nothing
+    
+        for (γ,λ) in ProgressBar(product(gamma, lambda))
+            err = elastic_net_cv(X, Y, γ, λ, folds; silent = silent, constraints = constraints)
+            if err < best_error
+                best_error = err; best_gamma = γ; best_lambda = λ
+            end
+        end
+        println("Selected gamma=$best_gamma, lambda=$best_lambda via $folds-fold CV")
+        gamma, lambda = best_gamma, best_lambda
+    end
 
     # Estimate the model
     # Simple version: OLS 
@@ -234,11 +276,15 @@ function estimate!(problem::FKRBProblem; method = "elasticnet", gamma = 0.3, lam
     elseif method == "elasticnet"
         # Constrained elastic net: 
         # Currently for fixed user-provided hyperparameters, but could add cross-validation to choose them
-        @views w_en = elasticnet(df_inner[!,"y"], df_inner[!,r"x"], gamma, lambda) 
+        @views w_en = elasticnet(
+            df_inner[!,"y"], df_inner[!,r"x"], 
+            gamma, lambda; 
+            silent = silent,
+            constraints = constraints) 
         # MLJ version: @views w_en = elasticnet(df_inner[!,r"x"], df_inner[!,"y"]; gamma = gamma, lambda = lambda) 
     else
         throw(ArgumentError("Method `$method` not implemented -- choose between `elasticnet` or `ols`"))
     end
 
     problem.results = w_en;
-end 
+end

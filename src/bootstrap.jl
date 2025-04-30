@@ -37,9 +37,10 @@ function subsample!(problem::FKRBProblem;
 end
 
 
-function bootstrap!(problem::FKRBProblem; n_samples = 100)
+function bootstrap!(problem::FKRBProblem; n_samples = 100, 
+    lambda = 1e-6, cross_validate = false)
+
     df = problem.data;
-    
     start_string = "Starting boostrap with $(n_samples) replications..."
     println(start_string)
 
@@ -50,11 +51,13 @@ function bootstrap!(problem::FKRBProblem; n_samples = 100)
             problem.linear, 
             problem.nonlinear, 
             problem.iv, 
-            problem.grid_points, 
+            problem.grid_points,
+            zeros(2,2), # regressors
             problem.results, 
             problem.train, 
             [],[],[]);
-        estimate!(boot_problem, gamma = 0.001, lambda = 1e-6)
+        boot_problem.regressors = generate_regressors_aggregate(boot_problem, method = "level")
+        estimate!(boot_problem, lambda = lambda, cross_validate = cross_validate)
         push!(results_store, boot_problem.results)
     end
 

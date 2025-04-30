@@ -8,7 +8,8 @@ function price_elasticities!(problem::FKRBProblem)
     # In FKRB, the RHS regressors are the "individual" level market shares, so 
     # we just need to re-generate them and use the estimated weights to average them 
     # call aggregate regressors function
-    s_i = generate_regressors_aggregate(problem, method = "level")
+    # s_i = generate_regressors_aggregate(problem, method = "level")
+    s_i = problem.regressors;
     
     weights = problem.results[1];
     price_coefs = problem.grid_points[:,findfirst(problem.nonlinear .== "prices")];

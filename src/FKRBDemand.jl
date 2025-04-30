@@ -10,6 +10,7 @@ using IterTools
 using Distributions, FRACDemand, Plots, FixedEffectModels
 using SCS, Convex
 using StatsBase, ForwardDiff
+using ProgressBars
 
 # using SCS, Convex, CSV,
 
