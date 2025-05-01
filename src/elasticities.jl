@@ -11,7 +11,7 @@ function price_elasticities!(problem::FKRBProblem)
     # s_i = generate_regressors_aggregate(problem, method = "level")
     s_i = problem.regressors;
     
-    weights = problem.results[1];
+    weights = problem.results["weights"];
     price_coefs = problem.grid_points[:,findfirst(problem.nonlinear .== "prices")];
 
     df_out = DataFrame(market_ids = unique(problem.data.market_ids))

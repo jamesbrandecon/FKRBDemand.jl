@@ -116,12 +116,13 @@ function define_problem(;
             data = data, 
             linear = linear, 
             nonlinear = nonlinear,
+            cov = "all",
             fixed_effects = fixed_effects,
             se_type = "bootstrap", 
             constrained = false);
 
         FRACDemand.estimate!(frac_problem)
-        # @show frac_problem.raw_results_internal
+        @show frac_problem.raw_results_internal
 
         data = frac_problem.data;
         for x in fixed_effects
@@ -284,7 +285,13 @@ function estimate!(problem::FKRBProblem; method = "elasticnet",
         # MLJ version: @views w_en = elasticnet(df_inner[!,r"x"], df_inner[!,"y"]; gamma = gamma, lambda = lambda) 
     else
         throw(ArgumentError("Method `$method` not implemented -- choose between `elasticnet` or `ols`"))
-    end
+    end 
 
-    problem.results = w_en;
+    # Calculate the implied mean and covariance of the random coefficients
+    μ, Σ = mean_and_covariance(grid_points, w_en[1])
+
+    problem.results = Dict(
+        "weights" => w_en[1], 
+        "mean" => μ,
+        "cov" => Σ)
 end

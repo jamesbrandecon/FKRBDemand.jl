@@ -10,7 +10,7 @@ function plot_cdfs(problem::FKRBProblem)
     linear = problem.linear;
     nonlinear = problem.nonlinear;
     all_vars = union(linear, nonlinear);
-    w = problem.results[1];
+    w = problem.results["weights"];
     grid_points = problem.grid_points;
 
     # Calculate the CDFs
@@ -34,7 +34,7 @@ function plot_pmfs(problem::FKRBProblem)
     linear = problem.linear;
     nonlinear = problem.nonlinear;
     all_vars = union(linear, nonlinear);
-    w = problem.results[1];
+    w = problem.results["weights"];
     grid_points = problem.grid_points;
 
     # Calculate and plot the PMFs
@@ -45,4 +45,143 @@ function plot_pmfs(problem::FKRBProblem)
         plot!(pmf_plot, unique_grid_points, pdf_nl, label = "Est. PDF $(nl)", lw = 1.2)
     end
     return pmf_plot
+end
+
+function plot_joint_heatmap(grid_points::AbstractMatrix,
+    weights::AbstractVector,
+    dim1::Int, dim2::Int;
+    normalize::Bool = true,
+    kwargs...)
+    # normalize
+    w = normalize ? weights ./ sum(weights) : weights
+
+    # extract and sort unique coords
+    xs = sort(unique(grid_points[:, dim1]))
+    ys = sort(unique(grid_points[:, dim2]))
+
+    # prepare Z matrix: rows→ys, cols→xs
+    Z = zeros(length(ys), length(xs))
+    for (gp, wi) in zip(eachrow(grid_points), w)
+    xi = findfirst(==(gp[dim1]), xs)
+    yi = findfirst(==(gp[dim2]), ys)
+    Z[yi, xi] += wi
+    end
+
+    heatmap(xs, ys, Z;
+    xlabel = "dim $dim1",
+    ylabel = "dim $dim2",
+    colorbar = true,
+    kwargs...)
+end
+
+import Plots.plot
+
+"""
+    plot_coefficients(
+        problem::FKRBProblem;
+        select_dims::Vector{String}=dim_names,
+        heatmap_kwargs   = (c = cgrad([:white, :lightblue, :blue]), alpha = 0.6),
+        marg_kwargs      = (c = :lightblue, alpha = 0.6),
+    )
+
+Create a pairs matrix of weighted marginal histograms (on the diagonal) and joint heatmaps
+(off–diagonal lower triangle), styled like an R “pairs()” summary.  You can select a subset
+of dimensions to plot via `select_dims`.
+
+# Arguments
+- `select_dims::Vector{String}`: subset of `dim_names` to include (default: all).
+- `heatmap_kwargs`: NamedTuple of keyword args passed to `heatmap()`.
+- `marg_kwargs`: NamedTuple of keyword args passed to `histogram()`.
+
+# Returns
+A Plots.jl plot object with an m×m grid, where m = length(select_dims).
+"""
+function plot_coefficients(
+        problem;
+        select_dims::Vector{String}= problem.nonlinear,
+        heatmap_kwargs   = (c = cgrad([:white, :lightblue, :blue]), alpha = 0.6),
+        marg_kwargs      = (c = :lightblue, alpha = 0.6),
+    )   
+
+    # Unpack
+    grid_points = problem.grid_points;
+    w           = problem.results["weights"];
+    dim_names   = problem.nonlinear;
+
+    # Map each name to its column index
+    name_to_idx = Dict(name => i for (i, name) in enumerate(dim_names))
+    # Look up indices for the selected dimensions (error if invalid)
+    idxs = [ getindex(name_to_idx, nm) for nm in select_dims ]
+
+    # Subset the grid and names
+    sub_grid  = grid_points[:, idxs]
+    sub_names = select_dims
+
+    m = size(sub_grid, 2)           # number of selected dims
+    panels = Vector{Plots.Plot}(undef, m * m)
+
+    for i in 1:m, j in 1:m
+        idx = (i - 1) * m + j
+
+        # axis labels only on left column and bottom row
+        xlabel = (i == m ? sub_names[j] : "")
+        ylabel = (j == 1 ? sub_names[i] : "")
+        title  = (i == 1 ? sub_names[j] : "")
+
+        if i == j
+            # Diagonal: weighted marginal histogram
+            vals = sub_grid[:, i]
+            panels[idx] = histogram(
+                vals;
+                weights = w,
+                legend  = false,
+                xlabel  = xlabel,
+                ylabel  = ylabel,
+                title   = title,
+                marg_kwargs...
+            )
+
+        elseif i > j
+            # Lower triangle: joint heatmap
+            xs = unique(sub_grid[:, j]) |> sort
+            ys = unique(sub_grid[:, i]) |> sort
+
+            # aggregate weights into a matrix
+            W = zeros(length(ys), length(xs))
+            for q in 1:length(w)
+                xv = sub_grid[q, j]
+                yv = sub_grid[q, i]
+                ix = searchsortedfirst(xs, xv)
+                iy = searchsortedfirst(ys, yv)
+                W[iy, ix] += w[q]
+            end
+
+            panels[idx] = heatmap(
+                xs, ys, W;
+                xlabel  = xlabel,
+                ylabel  = ylabel,
+                title   = title,
+                legend  = false,
+                heatmap_kwargs...,
+            )
+
+        else
+            # Upper triangle: empty
+            panels[idx] = plot(
+                framestyle = :none,
+                xlabel     = "",
+                ylabel     = "",
+                title      = title,
+                xticks     = false,
+                yticks     = false,
+            )
+        end
+    end
+
+    return plot(
+        panels...;
+        layout = (m, m),
+        link   = :none,
+        size   = (300 * m, 300 * m),
+    )
 end

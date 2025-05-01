@@ -78,3 +78,22 @@ function elastic_net_cv(X, Y, γ, λ, K;
     mean_error = mean(errors)
     return mean_error
 end
+
+"""
+    mean_and_covariance(grid_points, weights)
+    Calculates the mean and covariance of random coefficients, for easier interpretation, 
+    comparison with simulated values, and/or passing into other estimation functions. 
+"""
+function mean_and_covariance(
+    grid_points::AbstractMatrix{<:Real},
+    weights::AbstractVector{<:Real}
+)
+    w = weights ./ sum(weights)
+    μ = vec(sum(grid_points .* w, dims=1)) # Means
+    Xc = grid_points .- μ' # Centered grid points
+
+    # population covariance: Σ_pop = sum_i w_i * (v_i - μ)*(v_i - μ)'
+    Σ = (Xc .* w)' * Xc
+
+    return μ, Σ
+end

@@ -33,7 +33,7 @@ function subsample!(problem::FKRBProblem;
     end
 
     problem.inference_results = results_store;
-    problem.std = [std(getindex.(getindex.(problem.inference_results,1),i)) for i in 1:length(problem.results[1])]
+    problem.std = [std(getindex.(getindex.(problem.inference_results,1),i)) for i in 1:length(problem.results["weights"])]
 end
 
 
@@ -63,5 +63,5 @@ function bootstrap!(problem::FKRBProblem; n_samples = 100,
 
     problem.inference_results = results_store;
 
-    problem.std = [std(getindex.(getindex.(problem.inference_results,1),i)) for i in 1:length(problem.results[1])]
+    problem.std = [std(getindex.(getindex.(problem.inference_results,1),i)) for i in 1:length(problem.results["weights"])]
 end
