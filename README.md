@@ -35,11 +35,17 @@ Estimation is then straightforward:
 ```julia
 problem = FKRBDemand.define_problem( 
         data = df, 
-        linear = ["x", "prices"], 
-        nonlinear = ["x", "prices"], 
-        iv = ["demand_instruments0"]);
+        linear = ["prices", "x"], # in FKRB, linear and nonlinear should be the same
+        nonlinear = ["prices", "x"], 
+        train = [], # the set of market_ids to use for tuning regularization, mostly not yet useful
+        fixed_effects = ["product_ids"], # strings of column names in df to aborb in FRAC
+        alpha = 0.01, # FKRB grid will aim to cover (1-alpha*100)% of the distribution, based on FRACDemand estimates
+        step = 0.1 # step size for the FKRB grid
+        );
 
 FKRBDemand.estimate!(problem, 
+    method = "elasticnet", # only useful method implemented so far
+    constraints = [:nonnegativity, :proper_weights], # constraints on the weights
     lambda = 1e-6) # regularization strength
 ```
 
