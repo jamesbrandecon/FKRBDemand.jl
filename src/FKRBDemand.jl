@@ -9,7 +9,8 @@ using DataFrames, LinearAlgebra
 using IterTools
 using Distributions, FRACDemand, Plots, FixedEffectModels
 using SCS, Convex
-using StatsBase, ForwardDiff
+using StatsBase, KernelDensity
+using ForwardDiff
 using ProgressBars
 
 # using SCS, Convex, CSV,
@@ -26,6 +27,6 @@ include("elasticities.jl")
 export FKRBProblem, define_problem, estimate!, 
     generate_regressors_aggregate, make_grid_points, plot_cdfs,
     bootstrap!, subsample!, price_elasticities!, 
-    plot_pmfs
+    plot_pmfs, plot_coefficients
 
 end

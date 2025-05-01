@@ -100,7 +100,8 @@ function plot_coefficients(
         problem;
         select_dims::Vector{String}= problem.nonlinear,
         heatmap_kwargs   = (c = cgrad([:white, :lightblue, :blue]), alpha = 0.6),
-        marg_kwargs      = (c = :lightblue, alpha = 0.6),
+        marg_kwargs      = (c = :lightcoral, fillrange = 0, alpha = 0.5, nbins=50, fillalpha = 0.1),
+        include_CI::Bool = false
     )   
 
     # Unpack
@@ -131,15 +132,33 @@ function plot_coefficients(
         if i == j
             # Diagonal: weighted marginal histogram
             vals = sub_grid[:, i]
-            panels[idx] = histogram(
-                vals;
-                weights = w,
-                legend  = false,
-                xlabel  = xlabel,
-                ylabel  = ylabel,
-                title   = title,
-                marg_kwargs...
-            )
+            kde_est = kde(problem.grid_points[:,i]; weights = problem.results["weights"]);
+            base_plot = plot(
+                    kde_est.x, kde_est.density;
+                    legend  = false,
+                    xlabel  = xlabel,
+                    ylabel  = ylabel,
+                    title   = title,
+                    marg_kwargs...,
+                )
+        
+            # if problem.results has a "boot_weights" key, estimate a histogram on the same edges
+            # for each column, then add as CIs to the plot
+            if include_CI && haskey(problem.results, "boot_weights")
+                boot_weights = problem.results["boot_weights"]
+                for bi in 1:size(boot_weights, 2)
+                    kde_boot = kde(problem.grid_points[:,i], weights = boot_weights[:, bi]) 
+                    # add CIs to the plot
+                    plot!(
+                        kde_boot.x, kde_boot.density;
+                        label = false,
+                        color = :grey,
+                        alpha = 0.2
+                    )
+                end
+            end
+                
+            panels[idx] = base_plot
 
         elseif i > j
             # Lower triangle: joint heatmap

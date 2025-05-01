@@ -29,7 +29,7 @@ problem = FKRBDemand.define_problem(
         nonlinear = ["prices", "x"], 
         train = collect(1:300),
         fixed_effects = ["product_ids"],
-        alpha = 1e-5, 
+        alpha = 0.01, 
         step = 0.1
         );
 
@@ -58,33 +58,15 @@ FKRBDemand.estimate!(problem,
     lambda = range(1e-6, 0.1, 2), 
     cross_validate = true) 
 
-# ----------------
-# Plots
-# ----------------
-# CDF
-cdf_plot = plot_cdfs(problem)
-# add true CDFs
-plot!(cdf_plot, unique(problem.grid_points[:,1]), cdf.(Normal(preference_means[1],preference_SDs[1]), unique(problem.grid_points[:,1])), color = :blue, ls = :dash, label = "CDF 1, true")
-plot!(cdf_plot, unique(problem.grid_points[:,2]), cdf.(Normal(preference_means[2],preference_SDs[2]), unique(problem.grid_points[:,2])), color = :red, ls = :dash, label = "CDF 2, true")
-
-
-pmf_plot = plot_pmfs(problem)
-# add true PMFs 
-plot!(pmf_plot, unique(problem.grid_points[:,1]), pdf.(Normal(preference_means[1],preference_SDs[1]), unique(problem.grid_points[:,1])) ./sum(pdf.(Normal(preference_means[1],preference_SDs[1]), unique(problem.grid_points[:,1]))), color = :blue, ls = :dash, label = "PDF 1, true")
-plot!(pmf_plot, unique(problem.grid_points[:,2]), pdf.(Normal(preference_means[2],preference_SDs[2]), unique(problem.grid_points[:,2])) ./sum(pdf.(Normal(preference_means[2],preference_SDs[2]), unique(problem.grid_points[:,2]))), color = :red, ls = :dash, label = "PDF 2, true")
-
 # -------------------------------
 # Inference + post-estimation
 # -------------------------------
-FKRBDemand.subsample!(problem; n_samples = 5)
-FKRBDemand.bootstrap!(problem, n_samples = 20)
+FKRBDemand.subsample!(problem; n_samples = 500)
+FKRBDemand.bootstrap!(problem, n_samples = 5)
 
 # You can then pull the estimated weights and standard errors for individual regression coefficients: 
 parameters = problem.results["weights"]; # parameters will contain the weights associated with each grid point
 std = problem.std; # Only valid after running subsample! or boostrap!-- 
-
-# std will contain the bootstrapped/subsampled standard error 
-grid = rename(DataFrame(problem.grid_points, :auto), :x1 => :x, :x2 => :prices);
 
 # Can calculate all price elasticities into a DataFrame  
 FKRBDemand.price_elasticities!(problem)
@@ -112,6 +94,23 @@ end
 true_own_elasticities = zeros(size(df,1))
 truth = Main.sim_true_price_elasticities(df_original, dropdims(β, dims=1), Σ)
 own_elasticities = elasticities_df[elasticities_df.product1 .== elasticities_df.product2,:elast]
+
+
+# ----------------
+# Plots
+# ----------------
+# CDF
+cdf_plot = plot_cdfs(problem)
+# add true CDFs
+plot!(cdf_plot, unique(problem.grid_points[:,1]), cdf.(Normal(preference_means[1],preference_SDs[1]), unique(problem.grid_points[:,1])), color = :blue, ls = :dash, label = "CDF 1, true")
+plot!(cdf_plot, unique(problem.grid_points[:,2]), cdf.(Normal(preference_means[2],preference_SDs[2]), unique(problem.grid_points[:,2])), color = :red, ls = :dash, label = "CDF 2, true")
+
+
+pmf_plot = plot_pmfs(problem)
+# add true PMFs 
+plot!(pmf_plot, unique(problem.grid_points[:,1]), pdf.(Normal(preference_means[1],preference_SDs[1]), unique(problem.grid_points[:,1])) ./sum(pdf.(Normal(preference_means[1],preference_SDs[1]), unique(problem.grid_points[:,1]))), color = :blue, ls = :dash, label = "PDF 1, true")
+plot!(pmf_plot, unique(problem.grid_points[:,2]), pdf.(Normal(preference_means[2],preference_SDs[2]), unique(problem.grid_points[:,2])) ./sum(pdf.(Normal(preference_means[2],preference_SDs[2]), unique(problem.grid_points[:,2]))), color = :red, ls = :dash, label = "PDF 2, true")
+
 
 histogram(
     own_elasticities, 
@@ -145,9 +144,9 @@ plot!(own_elasticities, own_elasticities,
     lw = 3)
 
 
-FKRBDemand.plot_coefficients(
+plot_coefficients(
         problem;
         select_dims = ["prices", "x"],
         heatmap_kwargs   = (c = cgrad([:white, :lightblue, :blue]), alpha = 0.6),
-        marg_kwargs      = (c = :lightcoral, alpha = 0.5, bins=50)
+        marg_kwargs      = (c = :lightcoral, lw=2, alpha = 0.8, nbins=50)
     )

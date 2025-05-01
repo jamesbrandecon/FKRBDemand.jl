@@ -2,7 +2,6 @@
 function subsample!(problem::FKRBProblem; 
     n = nothing,
     n_samples = 100, 
-    gamma = 0.001,
     lambda = 1e-6)
 
     df = problem.data;
@@ -14,26 +13,34 @@ function subsample!(problem::FKRBProblem;
     end
 
     println(start_string)
-    if ((gamma == 0.001)  & (lambda ==1e-6))
-        println("Using default penalty parameters gamma == $gamma and lambda == $lambda")
+    if (lambda ==1e-6)
+        println("Using default penalty parameter lambda == $lambda")
     end
     
     results_store = [];
-    for i in 1:n_samples
-        df_sub =  df[StatsBase.sample(collect(1:nrow(df)), n, replace=false), :];
+    for i in ProgressBar(1:n_samples)
+        idn = StatsBase.sample(collect(1:nrow(df)), n, replace=false);
+        df_sub =  df[idn, :];
+        regressors_sub = problem.regressors[idn, :];
         sub_problem = FKRBProblem(df_sub, 
             problem.linear, 
             problem.nonlinear, 
             problem.iv, 
             problem.grid_points, 
-            problem.results, problem.train,
+            regressors_sub,
+            problem.results, 
+            problem.train,
             [],[],[]);
-        estimate!(sub_problem, gamma = gamma, lambda = lambda)
+        estimate!(sub_problem, lambda = lambda)
         push!(results_store, sub_problem.results)
     end
 
     problem.inference_results = results_store;
-    problem.std = [std(getindex.(getindex.(problem.inference_results,1),i)) for i in 1:length(problem.results["weights"])]
+    problem.std = [std(getindex.(getindex.(problem.inference_results,"weights"),i)) for i in 1:length(problem.results["weights"])];
+    push!(
+        problem.results, 
+        "boot_weights" => hcat(getindex.(problem.inference_results,"weights")...)
+    )
 end
 
 
@@ -45,7 +52,7 @@ function bootstrap!(problem::FKRBProblem; n_samples = 100,
     println(start_string)
 
     results_store = [];
-    for i in 1:n_samples
+    for i in ProgressBar(1:n_samples)
         df_boot = df[sample(collect(1:nrow(df)), nrow(df), replace=true), :]
         boot_problem = FKRBProblem(df_boot, 
             problem.linear, 
@@ -62,6 +69,11 @@ function bootstrap!(problem::FKRBProblem; n_samples = 100,
     end
 
     problem.inference_results = results_store;
-
-    problem.std = [std(getindex.(getindex.(problem.inference_results,1),i)) for i in 1:length(problem.results["weights"])]
+    problem.std = [
+        std(getindex.(getindex.(problem.inference_results,"weights"),i)) 
+        for i in 1:length(problem.results["weights"])];
+    push!(
+        problem.results, 
+        "boot_weights" => hcat(getindex.(problem.inference_results,"weights")...)
+    )
 end

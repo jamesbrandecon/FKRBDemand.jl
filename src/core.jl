@@ -290,8 +290,24 @@ function estimate!(problem::FKRBProblem; method = "elasticnet",
     # Calculate the implied mean and covariance of the random coefficients
     μ, Σ = mean_and_covariance(grid_points, w_en[1])
 
+    # Creat dataframes for easier reading and manipulation of results
+    result_df = DataFrame(grid_points, problem.nonlinear)
+    result_df[!,"weights"] = w_en[1]
+
+    cdf_df = DataFrame(
+        value = range(minimum(grid_points), maximum(grid_points), length = 100),
+        )
+    for nl in eachindex(problem.nonlinear) 
+        # unique_grid_points = sort(unique(problem.grid_points[:,nl]));
+        cdf_nl = [sum(w_en[1][findall(grid_points[:,nl] .<= cdf_df.value[i])]) for i in 1:length(cdf_df.value)] 
+        cdf_df[!,problem.nonlinear[nl]] = cdf_nl
+    end
+
     problem.results = Dict(
         "weights" => w_en[1], 
         "mean" => μ,
-        "cov" => Σ)
+        "cov" => Σ, 
+        "weights_dataframe" => result_df, 
+        "cdf_dataframe" => cdf_df
+        )
 end
