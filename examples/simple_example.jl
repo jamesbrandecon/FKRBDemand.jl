@@ -93,7 +93,8 @@ end
 
 true_own_elasticities = zeros(size(df,1))
 truth = Main.sim_true_price_elasticities(df_original, dropdims(β, dims=1), Σ)
-own_elasticities = elasticities_df[elasticities_df.product1 .== elasticities_df.product2,:elast]
+truth[truth.product_i .== truth.product_j,:]
+own_elasticities = elasticities_df[(elasticities_df.product1 .== elasticities_df.product2),:]
 
 
 # ----------------
@@ -131,7 +132,7 @@ histogram!(
     )
 
 scatter(
-    own_elasticities, 
+    own_elasticities.elast, 
     truth[truth.product_i .== truth.product_j,:elasticity], 
     label = "", 
     color = :lightcoral, 
@@ -139,7 +140,7 @@ scatter(
     xlabel = "Estimated Own-Price Elasticity",
     ylabel = "True Own-Price Elasticity"
 )
-plot!(own_elasticities, own_elasticities, 
+plot!(own_elasticities.elast, own_elasticities.elast, 
     label = "45 degree line", color = :black, ls = :dash, 
     lw = 3)
 

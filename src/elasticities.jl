@@ -1,3 +1,34 @@
+function elasticities_df(problem::FKRBProblem)
+    df_out = DataFrame(
+        market_ids = Int[],
+        product1   = eltype(problem.data.product_ids)[],
+        product2   = eltype(problem.data.product_ids)[],
+        elast      = Float64[]
+    )
+
+    for row in eachrow(problem.all_elasticities)
+        m         = row.market_ids
+        elast_mat = row.elasts
+        # get the actual product IDs in market m
+        prods     = unique(problem.data.product_ids[problem.data.market_ids .== m])
+        J         = length(prods)
+
+        for i in prods, j in prods
+            e = elast_mat[i,j]
+            # if !isnan(e)
+                push!(df_out, (
+                    market_ids = m,
+                    product1   = i,
+                    product2   = j,
+                    elast      = e
+                ))
+            # end
+        end
+    end
+
+    return df_out
+end
+
 function price_elasticities!(problem::FKRBProblem)
     try 
         @assert problem.results !=[];
@@ -14,10 +45,11 @@ function price_elasticities!(problem::FKRBProblem)
     weights = problem.results["weights"];
     price_coefs = problem.grid_points[:,findfirst(problem.nonlinear .== "prices")];
 
-    df_out = DataFrame(market_ids = unique(problem.data.market_ids))
+    # df_out = DataFrame() # market_ids = unique(problem.data.market_ids)
+    markets_vec = [];
     elast_vec = [];
     all_products = unique(problem.data.product_ids);
-    for m in unique(problem.data.market_ids)
+    Threads.@threads for m in unique(problem.data.market_ids)
         products_m = unique(problem.data[problem.data.market_ids .==m,:].product_ids);
         temp_m = zeros(length(all_products), length(all_products));
         temp_m .= NaN;
@@ -48,23 +80,91 @@ function price_elasticities!(problem::FKRBProblem)
             end
         end
         push!(elast_vec, temp_m)
+        push!(markets_vec, m)
     end
-    df_out[!,"elasts"] = elast_vec;
+
+    df_out = sort(
+        DataFrame(market_ids = markets_vec, elasts = elast_vec), 
+        :market_ids
+        )
 
     problem.all_elasticities = df_out;
 end
 
-function elasticities_df(problem::FKRBProblem)
-    df_out = DataFrame(market_ids = [], product1 = [], product2 = [], elast = []);
-    for m in unique(problem.data.market_ids)
-        elast_mat = problem.all_elasticities[problem.all_elasticities.market_ids .==m,:].elasts[1];
-        for j1 in unique(problem.data.product_ids)
-            for j2 in unique(problem.data.product_ids)
-                if !isnan(elast_mat[j1,j2])
-                    push!(df_out, [m,j1,j2, elast_mat[j1,j2]])
+function price_elasticities_new!(problem::FKRBProblem)
+    @assert !isempty(problem.results) "Must run estimate! before price_elasticities!"
+
+    # 1) Extract regressors, weights, and coefficient grid
+    R = Matrix(problem.regressors)              # N × Q
+    w = problem.results["weights"]              # length-Q
+    # find the column index for "prices" in nonlinear
+    price_col = findfirst(isequal("prices"), problem.nonlinear)
+    v_prices = problem.grid_points[:, price_col]  # Q-vector
+    α = dot(v_prices, w)                         # scalar alpha
+
+    # 2) Pull raw data columns into arrays
+    df = problem.data
+    m_ids = df.market_ids
+    p_ids = df.product_ids
+    P_vals = df.prices
+    S_vals = df.shares
+
+    # 3) Build grouping maps
+    markets = unique(m_ids)                     # in original order
+    Nmk = length(markets)
+    # market → all row indices in that market
+    m_to_rows = Dict(m => findall(==(m), m_ids) for m in markets)
+    # global product list and mapping to matrix index
+    all_prods = unique(p_ids)
+    Pn = length(all_prods)
+
+    # 4) Prepare result container
+    mats = Vector{Matrix{Float64}}(undef, Nmk)
+
+    # 5) Loop over markets
+    for (mi, m) in enumerate(markets)
+        rows = m_to_rows[m]
+        # Which products appear here and map to their row
+        prods_m  = p_ids[rows]
+        row_by   = Dict(prods_m[i] => rows[i] for i in 1:length(rows))
+
+        # Preallocate Pn×Pn matrix with NaN
+        M_e = fill(NaN, Pn, Pn)
+
+        # Loop over all global products for j1, j2
+        for j1_ind in 1:Pn
+            prod1 = all_prods[j1_ind]
+            if haskey(row_by, prod1)
+                r1 = row_by[prod1]
+                # follow original: take only the first regressor entry
+                s1 = R[r1, 1]
+                for j2_ind in 1:Pn
+                    prod2 = all_prods[j2_ind]
+                    if haskey(row_by, prod2)
+                        r2 = row_by[prod2]
+                        s2 = R[r2, 1]
+                        # derivative following original broadcast+indexing
+                        ds_dp = if j1_ind == j2_ind
+                            α * s1 * (1 - s1)
+                        else
+                            -α * s1 * s2
+                        end
+                        # compute elasticity
+                        pj1  = P_vals[r1]
+                        sh2  = S_vals[r2]
+                        M_e[j1_ind, j2_ind] = ds_dp * pj1 / sh2
+                    end
                 end
             end
         end
+
+        mats[mi] = M_e
     end
-    return df_out
+
+    # 6) Attach to problem exactly as before
+    problem.all_elasticities = DataFrame(
+        market_ids = markets,
+        elasts     = mats
+    )
+    return nothing
 end
