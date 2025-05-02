@@ -27,6 +27,6 @@ include("elasticities.jl")
 export FKRBProblem, define_problem, estimate!, 
     generate_regressors_aggregate, make_grid_points, plot_cdfs,
     bootstrap!, subsample!, price_elasticities!, 
-    plot_pmfs, plot_coefficients
+    plot_pmfs, plot_coefficients, predict!
 
 end

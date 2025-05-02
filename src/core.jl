@@ -187,30 +187,54 @@ function generate_regressors_aggregate(problem; method = "level")
     all_vars = union(linear, nonlinear);
     grid_points = problem.grid_points;
 
+    # 1) precompute per‑market row‐indices and X_m matrices (and xi if present)
+    m_ids      = data.market_ids
+    markets    = unique(m_ids)
+    rows_map   = Dict(m => findall(==(m), m_ids) for m in markets)
+    X_map      = Dict(m => Matrix(data[rows_map[m], all_vars]) for m in markets)
+    has_xi     = "xi" in names(data)
+    xi_map     = has_xi ? Dict(m => data[rows_map[m], :xi] for m in markets) : nothing
+
+    # 2) pick correct share‐function
     if method == "level"
-        level_or_diff = (x,b) -> logexpratio(x, b);
+        level_or_diff = (x,b) -> logexpratio(x, b)
     else
         level_or_diff_i = (x,b,i) -> ForwardDiff.gradient(x -> logexpratio(x,b)[i], x)[i,2];
         level_or_diff = (x,b) -> [level_or_diff_i(x,b,i) for i in 1:size(x,1)]
     end
 
-    # Generate RHS regressors -- each term is a logit-form market share, calculated at a given grid point of parameters
-    regressors = Array{Float64}(undef, size(data, 1), size(grid_points, 1)); 
-    for m ∈ sort(unique(data.market_ids))
-        i = 1;
-        @views for g ∈ eachrow(grid_points) 
-            X_m = Matrix(data[data.market_ids .== m, all_vars]);
-            if "xi" in names(data)
-                xi = data[data.market_ids .==m, :xi];
-                regressors[data.market_ids .== m, i] = level_or_diff([X_m xi], vcat(g,1));
+    # 3) allocate and parallel loop over draws
+    N, G        = size(data,1), size(grid_points,1)
+    regressors  = Array{Float64}(undef, N, G)
+    Threads.@threads for g in 1:G
+        b = grid_points[g, :]
+        for m in markets
+            rows = rows_map[m]
+            X    = X_map[m]
+            if has_xi
+                regressors[rows, g] = level_or_diff([X xi_map[m]], vcat(b,1))
             else
-                regressors[data.market_ids .== m, i] = level_or_diff(X_m, g);
+                regressors[rows, g] = level_or_diff(X, b)
             end
-            i +=1;
         end
     end
-    
+
     return regressors
+end
+
+"""
+    predict!(df, problem)
+    Predicts market shares in a new dataframe using the estimated FKRB model.
+    df: DataFrame containing the data. The `predicted_shares` column will be added or replaced.
+    problem: FKRBProblem object containing the estimated model.
+"""
+function predict!(df::DataFrame, problem::FKRBProblem)
+    copy_problem = deepcopy(problem);
+    copy_problem.data = df;
+    regressors = generate_regressors_aggregate(copy_problem; method = "level")
+
+    prediction = regressors * copy_problem.results["weights"];
+    df[!,"predicted_shares"] = prediction;
 end
 
 
