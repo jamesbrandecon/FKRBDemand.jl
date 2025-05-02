@@ -18,7 +18,6 @@ using ProgressBars
 # Include source files
 include("core.jl")
 include("estimation.jl")
-include("simulation.jl")
 include("visualization.jl")
 include("grids.jl")
 include("bootstrap.jl")
