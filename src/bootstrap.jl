@@ -1,4 +1,18 @@
-# bootstrap 
+
+"""
+    subsample!(problem::FKRBProblem)
+
+# Arguments
+- `problem::FKRBProblem`: FKRB problem (should be `estimated` first).
+- `n::Int = nothing`: The number of samples to draw from the data. If `nothing`, a default value is used.
+- `n_samples::Int = 100`: The number of bootstrap samples to generate.
+- `lambda::Float64 = 1e-6`: The regularization strength parameter for the elastic net.
+
+# Change to the problem object:
+- `problem.inference_results`: A list of raw bootstrap results.
+- `problem.std`: A vector of standard deviations for each weight parameter.
+- `problem.results["boot_weights"]`: A matrix of weights, where each column corresponds to a subsample estimate.
+"""
 function subsample!(problem::FKRBProblem; 
     n = nothing,
     n_samples = 100, 
@@ -44,6 +58,23 @@ function subsample!(problem::FKRBProblem;
 end
 
 
+"""
+    bootstrap!(problem::FKRBProblem; n_samples = 100, lambda = 1e-6, cross_validate = false)
+
+Perform standard bootstrapping on the given `FKRBProblem` to estimate the uncertainty of model parameters and derived quantities.
+This function modifies the `problem` object in place by adding bootstrap results to it.
+
+# Arguments
+- `problem::FKRBProblem`: FKRB problem (should be `estimated` first).
+- `n_samples::Int = 100`: The number of bootstrap samples to generate.
+- `lambda::Float64 = 1e-6`: The regularization strength parameter for the elastic net.
+- `cross_validate::Bool = false`: If true, perform cross-validation to select the optimal penalty parameter.
+
+# Change to the problem object: 
+- `problem.inference_results`: A list of raw bootstrap results.
+- `problem.std`: A vector of standard deviations for each weight parameter.
+- `problem.results["boot_weights"]`: A matrix of bootstrap weights, where each column corresponds to a bootstrap sample.
+"""
 function bootstrap!(problem::FKRBProblem; n_samples = 100, 
     lambda = 1e-6, cross_validate = false)
 

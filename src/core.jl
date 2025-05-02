@@ -65,8 +65,25 @@ mutable struct FKRBGridDetails
 end
 
 """ 
-    define_problem(;method = "FKRB", data=[], linear=[], nonlinear=[], iv=[], train=[])
-Defines the FKRB problem, which is just a container for the data and results. 
+    define_problem(; data, linear, nonlinear, 
+        fixed_effects = [""], train=[], 
+        range = (-Inf, Inf), step = 0.1, 
+        alpha = 0.0001)
+Defines the FKRB problem, which is just a container for the data and eventual results. 
+
+Arguments:
+- `data`: DataFrame containing the data.
+- `linear`: Vector of strings representing variables to be included in the utility function
+    - This should match `nonlinear` -- the API only includes both because it borrows from FRACDemand.jl
+- `nonlinear`:  Vector of strings representing variables to be included in the utility function
+- `fixed_effects`: Vector of strings representing fixed effects (default: empty).
+- `train`: Vector of market_ids representing the hyperparameter turning data (default: empty).
+- `range`: Range of domain for random coefficients (default: (-Inf, Inf)).
+- `step`: Step size for the grid points (default: 0.1).
+- `alpha`: Significance level for confidence intervals (default: 0.0001).
+
+Returns:
+- FKRBProblem object containing the defined problem.
 """
 function define_problem(; 
     data=[], linear=[], nonlinear=[], fixed_effects = [""], train=[],
@@ -239,9 +256,29 @@ end
 
 
 """ 
-    estimate!(problem::FKRBProblem; gamma = 0.3, lambda = 0.0)
+    estimate!(problem::FKRBProblem; 
+        method = "elasticnet",
+        constraints = nothing,
+        silent = true,
+        gamma = 0.5, lambda = 0.0,
+        cross_validate = false, 
+        folds = 5)
 Estimates the FKRB model using constrained elastic net. Problem is solved using Convex.jl, and estimated weights 
 are constrained to be nonnegative and sum to 1. Results are stored in problem.results.
+
+Arguments:
+- `problem::FKRBProblem`: FKRB problem to be estimated.
+- `method::String`: Method to use for estimation (default: "elasticnet").
+- `constraints::Vector`: Constraints to apply to the estimation (default: nothing).
+    - Options: `:nonnegativity`, `:proper_weights`
+- `silent::Bool`: If true, suppresses printing of traces during optimization (default: true).
+- `gamma::Float64`: Elastic net mixing parameter (default: 0.5).
+- `lambda::Float64`: Regularization parameter (default: 0.0).
+- `cross_validate::Bool`: If true, performs cross-validation to select the optimal penalty parameter (default: false).
+- `folds::Int`: Number of folds for cross-validation (default: 5).
+
+Returns:
+- `problem`: The FKRBProblem object with the estimated weights and other results.
 """
 function estimate!(problem::FKRBProblem; method = "elasticnet",
                 constraints = nothing,
