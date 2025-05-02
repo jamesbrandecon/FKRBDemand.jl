@@ -7,8 +7,7 @@ makedocs(
     modules = [FKRBDemand], 
     warnonly = true,
     pages = [
-        "Home" => "index.md",
-        "API" => "api.md"]
+        "Home" => "index.md"]
 )
 
 deploydocs(
