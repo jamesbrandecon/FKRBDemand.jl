@@ -46,7 +46,6 @@ function price_elasticities!(problem::FKRBProblem)
     price_coefs = problem.grid_points[:,findfirst(problem.nonlinear .== "prices")];
 
     # df_out = DataFrame() # market_ids = unique(problem.data.market_ids)
-    markets_vec = [];
     elast_vec = [];
     all_products = unique(problem.data.product_ids);
     Threads.@threads for m in unique(problem.data.market_ids)
@@ -79,12 +78,14 @@ function price_elasticities!(problem::FKRBProblem)
                 end
             end
         end
-        push!(elast_vec, temp_m)
-        push!(markets_vec, m)
+        push!(elast_vec, (m, temp_m))
     end
 
     df_out = sort(
-        DataFrame(market_ids = markets_vec, elasts = elast_vec), 
+        DataFrame(
+            market_ids = getindex.(elast_vec,1), 
+            elasts     = getindex.(elast_vec,2)
+        ),
         :market_ids
         )
 
