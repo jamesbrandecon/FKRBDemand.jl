@@ -22,14 +22,13 @@ df = select(df, Not(:xi))
 df[!,"demand_instruments3"] = df[!,"demand_instruments1"] .* df[!,"demand_instruments2"]
 # If you don't provide domain ranges, define_problem will run FRAC.jl with the same problem specs
 # and will use the estimated variance of preferences to define a grid width 
-# that should cover 99% of the preference domain based on those estimates
+# that should cover 99.9%, i.e. (1-alpha)%, of the preference domain based on those estimates
 problem = FKRBDemand.define_problem( 
         data = df, 
         linear = ["prices", "x"], 
         nonlinear = ["prices", "x"], 
-        train = collect(1:300),
         fixed_effects = ["product_ids"],
-        alpha = 0.01, 
+        alpha = 0.001, 
         step = 0.1
         );
 
@@ -41,8 +40,7 @@ problem = FKRBDemand.define_problem(
             linear = ["prices", "x"],
             nonlinear = ["prices", "x"],
             fixed_effects = ["dummy_FE"],
-            train = collect(1:300),
-            range = Dict("x" => -4:0.1:0, "prices" => -4:0.1:0));
+            range = Dict("x" => 0:0.1:4, "prices" => -4:0.1:0));
 
 # One-line estimation
 FKRBDemand.estimate!(problem, 
@@ -72,27 +70,27 @@ std = problem.std; # Only valid after running subsample! or boostrap!--
 FKRBDemand.price_elasticities!(problem)
 elasticities_df = FKRBDemand.elasticities_df(problem)
 
-function sim_true_price_elasticities(df::DataFrame, beta::AbstractVector, Σ::AbstractMatrix;
-    price_col::Symbol=:prices,
-    x_col::Symbol=:x,
-    xi_col::Symbol=:xi)
-    out = DataFrame(market_ids=Int[], product_i=Int[], product_j=Int[], elasticity=Float64[])
-    for subdf in groupby(df, :market_ids)
-        p  = subdf[!, price_col]
-        x  = subdf[!, x_col]
-        xi = subdf[!, xi_col]
-        fe = hasproperty(subdf, :market_FEs) ? first(subdf.market_FEs) : 0
-        E  = FRACDemand.sim_price_elasticities(p, x, xi, beta, Σ; market_FE=fe)
-        mid, products = first(subdf.market_ids), unique(subdf.product_ids)
-        for i in eachindex(products), j in eachindex(products)
-            push!(out, (market_ids=mid, product_i=products[i], product_j=products[j], elasticity=E[i,j]))
-        end
-    end
-    return out
-end
+# function sim_true_price_elasticities(df::DataFrame, beta::AbstractVector, Σ::AbstractMatrix;
+#     price_col::Symbol=:prices,
+#     x_col::Symbol=:x,
+#     xi_col::Symbol=:xi)
+#     out = DataFrame(market_ids=Int[], product_i=Int[], product_j=Int[], elasticity=Float64[])
+#     for subdf in groupby(df, :market_ids)
+#         p  = subdf[!, price_col]
+#         x  = subdf[!, x_col]
+#         xi = subdf[!, xi_col]
+#         fe = hasproperty(subdf, :market_FEs) ? first(subdf.market_FEs) : 0
+#         E  = FRACDemand.sim_price_elasticities(p, x, xi, beta, Σ; market_FE=fe)
+#         mid, products = first(subdf.market_ids), unique(subdf.product_ids)
+#         for i in eachindex(products), j in eachindex(products)
+#             push!(out, (market_ids=mid, product_i=products[i], product_j=products[j], elasticity=E[i,j]))
+#         end
+#     end
+#     return out
+# end
 
 true_own_elasticities = zeros(size(df,1))
-truth = Main.sim_true_price_elasticities(df_original, dropdims(β, dims=1), Σ)
+truth = FRACDemand.sim_true_price_elasticities(df_original, dropdims(β, dims=1), Σ)
 truth[truth.product_i .== truth.product_j,:]
 own_elasticities = elasticities_df[(elasticities_df.product1 .== elasticities_df.product2),:]
 
@@ -106,15 +104,15 @@ cdf_plot = plot_cdfs(problem)
 plot!(cdf_plot, unique(problem.grid_points[:,1]), cdf.(Normal(preference_means[1],preference_SDs[1]), unique(problem.grid_points[:,1])), color = :blue, ls = :dash, label = "CDF 1, true")
 plot!(cdf_plot, unique(problem.grid_points[:,2]), cdf.(Normal(preference_means[2],preference_SDs[2]), unique(problem.grid_points[:,2])), color = :red, ls = :dash, label = "CDF 2, true")
 
-
+# PDF
 pmf_plot = plot_pmfs(problem)
 # add true PMFs 
 plot!(pmf_plot, unique(problem.grid_points[:,1]), pdf.(Normal(preference_means[1],preference_SDs[1]), unique(problem.grid_points[:,1])) ./sum(pdf.(Normal(preference_means[1],preference_SDs[1]), unique(problem.grid_points[:,1]))), color = :blue, ls = :dash, label = "PDF 1, true")
 plot!(pmf_plot, unique(problem.grid_points[:,2]), pdf.(Normal(preference_means[2],preference_SDs[2]), unique(problem.grid_points[:,2])) ./sum(pdf.(Normal(preference_means[2],preference_SDs[2]), unique(problem.grid_points[:,2]))), color = :red, ls = :dash, label = "PDF 2, true")
 
-
+# Histogram of estimated and true elasticities
 histogram(
-    own_elasticities, 
+    own_elasticities.elast, 
     label = "Estimated", 
     xlabel = "Own-Price Elasticity", 
     ylabel = "Count", 
@@ -131,6 +129,7 @@ histogram!(
     normalize = :density
     )
 
+# Scatterplot of estimated vs true elasticities
 scatter(
     own_elasticities.elast, 
     truth[truth.product_i .== truth.product_j,:elasticity], 
@@ -144,7 +143,7 @@ plot!(own_elasticities.elast, own_elasticities.elast,
     label = "45 degree line", color = :black, ls = :dash, 
     lw = 3)
 
-
+# Joint heatmap of estimated coefficients
 plot_coefficients(
         problem;
         select_dims = ["prices", "x"],
