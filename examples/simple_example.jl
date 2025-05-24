@@ -70,24 +70,6 @@ std = problem.std; # Only valid after running subsample! or boostrap!--
 FKRBDemand.price_elasticities!(problem)
 elasticities_df = FKRBDemand.elasticities_df(problem)
 
-# function sim_true_price_elasticities(df::DataFrame, beta::AbstractVector, Σ::AbstractMatrix;
-#     price_col::Symbol=:prices,
-#     x_col::Symbol=:x,
-#     xi_col::Symbol=:xi)
-#     out = DataFrame(market_ids=Int[], product_i=Int[], product_j=Int[], elasticity=Float64[])
-#     for subdf in groupby(df, :market_ids)
-#         p  = subdf[!, price_col]
-#         x  = subdf[!, x_col]
-#         xi = subdf[!, xi_col]
-#         fe = hasproperty(subdf, :market_FEs) ? first(subdf.market_FEs) : 0
-#         E  = FRACDemand.sim_price_elasticities(p, x, xi, beta, Σ; market_FE=fe)
-#         mid, products = first(subdf.market_ids), unique(subdf.product_ids)
-#         for i in eachindex(products), j in eachindex(products)
-#             push!(out, (market_ids=mid, product_i=products[i], product_j=products[j], elasticity=E[i,j]))
-#         end
-#     end
-#     return out
-# end
 
 true_own_elasticities = zeros(size(df,1))
 truth = FRACDemand.sim_true_price_elasticities(df_original, dropdims(β, dims=1), Σ)
